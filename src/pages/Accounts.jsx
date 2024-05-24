@@ -1,24 +1,45 @@
 import React, { useEffect, useState } from "react";
-import { Button, Table, Switch } from "antd";
+import { Button, Table, Switch, Modal } from "antd";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import MySpin from "../components/MySpin";
 
 const Accounts = () => {
   const [users, setUsers] = useState([]);
+  const getAllAccounts = async () => {
+    await axios
+      .get("http://localhost:8080/api/users", { withCredentials: true })
+      .then((res) => {
+        const nonAdminUsers = res.data.users.filter(user => user.role !== 'Admin');
+        setUsers(nonAdminUsers);
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+  };
   useEffect(() => {
-    const getAllAccounts = async () => {
-      await axios
-        .get("http://localhost:8080/api/users", { withCredentials: true })
-        .then((res) => {
-          setUsers(res.data.users);
-        })
-        .catch((error) => {
-          console.log(error);
-        });
-    };
     getAllAccounts();
   }, []);
+
+  const handleStatusChange = (checked, username) => {
+    Modal.confirm({
+      title: "Are you sure you want to change the status?",
+      onOk: async () => {
+        const status = checked ? 1 : 0;
+        try {
+          await axios.put(
+            `http://localhost:8080/api/deleteUser?username=${username}`,
+            { status },
+            { withCredentials: true }
+          );
+          // Refresh the user list after updating the status
+          getAllAccounts();
+        } catch (error) {
+          console.log(error);
+        }
+      },
+    });
+  };
   const columns = [
     {
       title: "No.",
@@ -60,15 +81,16 @@ const Accounts = () => {
       title: "Status",
       dataIndex: "status",
       key: "status",
-      render: (status) => (
+      render: (status, record) => (
         <Switch
           checked={status === 1}
+          onChange={(checked) => handleStatusChange(checked, record.username)}
         />
       ),
     },
   ];
-  if(!users.length){
-    return <MySpin />
+  if (!users.length) {
+    return <MySpin />;
   }
 
   return (
@@ -80,8 +102,8 @@ const Accounts = () => {
           marginBottom: "10px",
         }}
       >
-        <Link to={'/accounts/create'}>
-        <Button type="primary">Create New User</Button>
+        <Link to={"/accounts/create"}>
+          <Button type="primary">Create New User</Button>
         </Link>
       </div>
       <Table columns={columns} dataSource={users} />;
